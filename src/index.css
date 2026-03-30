@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Убираем предупреждения о неизвестных правилах */
+@layer base {
+  html, body, #root {
+    height: 100%;
+  }
+}
+
+/* Анимация для кнопки установки */
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-bounce {
+  animation: bounce 2s infinite;
+}

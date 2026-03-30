@@ -1,0 +1,9 @@
+{
+  "version": "1.0",
+  "api_version": 1,
+  "layout": {
+    "logo": "/icons/favicon-96x96.png",
+    "color": "#4f46e5",
+    "show_title": true
+  }
+}
