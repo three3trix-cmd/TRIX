@@ -12,6 +12,33 @@ export default function ChatRoom({ roomId, user }) {
   const bottomRef = useRef(null)
   const channelRef = useRef(null)
 
+  // Функция показа уведомления (ДОБАВЛЕНА)
+  async function showNotification(message) {
+    if (!message || !document.hidden) return
+    if (Notification.permission !== 'granted') return
+    
+    const title = `${message.user_data?.name || 'Кто-то'} написал`
+    const options = {
+      body: message.text.length > 100 ? message.text.slice(0, 100) + '...' : message.text,
+      icon: '/icons/icon-192x192.png',
+      badge: '/icons/icon-72x72.png',
+      vibrate: [200, 100, 200],
+      tag: `room-${roomId}`,
+      renotify: true
+    }
+    
+    try {
+      const registration = await navigator.serviceWorker.getRegistration()
+      if (registration?.showNotification) {
+        registration.showNotification(title, options)
+      } else if (Notification.permission === 'granted') {
+        new Notification(title, options)
+      }
+    } catch (e) {
+      console.warn('Notification failed', e)
+    }
+  }
+
   useEffect(() => {
     if (!roomId) return
     let mounted = true
@@ -40,6 +67,10 @@ export default function ChatRoom({ roomId, user }) {
       
       if (payload.eventType === 'INSERT' && payload.new) {
         setMessages(prev => [...prev, payload.new])
+        // ПОКАЗЫВАЕМ УВЕДОМЛЕНИЕ (ДОБАВЛЕНО)
+        if (payload.new.user_data?.id !== user.id) {
+          showNotification(payload.new)
+        }
       } else if (payload.eventType === 'DELETE' && payload.old) {
         setMessages(prev => prev.filter(m => m.id !== payload.old.id))
       } else if (payload.eventType === 'UPDATE' && payload.new) {
@@ -55,7 +86,7 @@ export default function ChatRoom({ roomId, user }) {
         supabase.removeChannel(channelRef.current)
       }
     }
-  }, [roomId])
+  }, [roomId, user.id])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -182,7 +213,31 @@ export default function ChatRoom({ roomId, user }) {
               alt={fileName}
               className="max-w-full rounded-lg cursor-pointer"
               style={{ maxHeight: '200px' }}
-              onClick={() => window.open(imageData, '_blank')}
+              onClick={() => {
+                // Открываем в модальном окне вместо новой вкладки
+                const modal = document.createElement('div')
+                modal.style.position = 'fixed'
+                modal.style.top = '0'
+                modal.style.left = '0'
+                modal.style.right = '0'
+                modal.style.bottom = '0'
+                modal.style.backgroundColor = 'rgba(0,0,0,0.9)'
+                modal.style.zIndex = '1000'
+                modal.style.display = 'flex'
+                modal.style.alignItems = 'center'
+                modal.style.justifyContent = 'center'
+                modal.style.cursor = 'pointer'
+                
+                const img = document.createElement('img')
+                img.src = imageData
+                img.style.maxWidth = '90%'
+                img.style.maxHeight = '90%'
+                img.style.objectFit = 'contain'
+                
+                modal.appendChild(img)
+                modal.onclick = () => modal.remove()
+                document.body.appendChild(modal)
+              }}
             />
           )}
         </div>
@@ -194,7 +249,7 @@ export default function ChatRoom({ roomId, user }) {
   return (
     <div className="h-full flex flex-col relative">
       <div className="p-4 border-b bg-white/90 backdrop-blur-sm">
-        <div className="font-bold text-indigo-600">🐟 Рыболовная беседа</div>
+        <div className="font-bold text-indigo-600">🐟 Интеллектуальная беседа</div>
       </div>
 
       <div className="flex-1 overflow-auto p-4 space-y-3">

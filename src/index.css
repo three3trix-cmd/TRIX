@@ -2,23 +2,42 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Убираем предупреждения о неизвестных правилах */
-@layer base {
-  html, body, #root {
-    height: 100%;
-  }
+html, body, #root {
+  height: 100%;
 }
 
-/* Анимация для кнопки установки */
-@keyframes bounce {
-  0%, 100% {
-    transform: translateY(0);
+/* Адаптация для мобильных устройств */
+@media (max-width: 768px) {
+  /* Левая панель скрывается, показывается кнопка меню */
+  .room-panel {
+    position: fixed;
+    left: -280px;
+    top: 0;
+    bottom: 0;
+    width: 280px;
+    z-index: 40;
+    transition: left 0.3s ease;
   }
-  50% {
-    transform: translateY(-10px);
+  
+  .room-panel.open {
+    left: 0;
   }
-}
-
-.animate-bounce {
-  animation: bounce 2s infinite;
+  
+  .chat-panel {
+    width: 100%;
+  }
+  
+  /* Кнопка меню для мобильных */
+  .menu-button {
+    display: block;
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 50;
+    background: #4f46e5;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+  }
 }
