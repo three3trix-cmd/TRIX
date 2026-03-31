@@ -54,7 +54,7 @@ export default function App() {
     }
     
     if (Notification.permission === 'granted') {
-      new Notification('Уведомления уже включены! 🔥', {
+      new Notification('Уведомления уже включены! 🎣', {
         body: 'Вы будете получать уведомления о новых сообщениях',
         icon: '/icons/icon-192x192.png'
       })
@@ -70,7 +70,7 @@ export default function App() {
     setNotificationStatus(permission)
     
     if (permission === 'granted') {
-      new Notification('Уведомления включены! 🎣', {
+      new Notification('Уведомления включены! 🔥', {
         body: 'Теперь вы будете получать уведомления о новых сообщениях',
         icon: '/icons/icon-192x192.png'
       })
@@ -92,13 +92,15 @@ export default function App() {
 
   return (
     <div className="h-screen flex relative">
-      {/* Кнопка меню для мобильных */}
-      <button
-        onClick={() => setMenuOpen(!menuOpen)}
-        className="md:hidden fixed top-4 left-4 z-50 bg-indigo-600 text-white px-3 py-2 rounded-lg shadow-lg"
-      >
-        {menuOpen ? '✕' : '☰'} Комнаты
-      </button>
+      {/* Кнопка меню для мобильных - скрывается когда меню открыто */}
+      {!menuOpen && (
+        <button
+          onClick={() => setMenuOpen(true)}
+          className="md:hidden fixed top-4 left-4 z-50 bg-indigo-600 text-white px-3 py-2 rounded-lg shadow-lg"
+        >
+          ☰ Комнаты
+        </button>
+      )}
       
       {/* Кнопки в правом верхнем углу */}
       <div className="absolute top-4 right-4 z-50 flex gap-2">
@@ -127,18 +129,26 @@ export default function App() {
       <div className={`fixed md:relative inset-y-0 left-0 w-80 bg-white/95 backdrop-blur-sm flex flex-col z-40 transition-transform duration-300 ${
         menuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
       }`}>
-        <div className="p-4 border-b bg-white/50">
-          <div className="font-bold text-xl text-indigo-600">3TRIX 💬</div>
-          <div className="text-xs text-gray-500 mt-1">
-            {user.name} ⚛️
+        <div className="p-4 border-b bg-white/50 flex justify-between items-center">
+          <div>
+            <div className="font-bold text-xl text-indigo-600">3TRIX</div>
+            <div className="text-xs text-gray-500 mt-1">
+              {user.name} ⚛️
+            </div>
           </div>
           <button
-            onClick={handleLogout}
-            className="text-xs text-red-500 mt-2 hover:text-red-700 transition"
+            onClick={() => setMenuOpen(false)}
+            className="md:hidden text-gray-500 text-xl"
           >
-            Выйти на свободу
+            ✕
           </button>
         </div>
+        <button
+          onClick={handleLogout}
+          className="text-xs text-red-500 p-3 hover:bg-red-50 transition text-left"
+        >
+          Выйти на свободу
+        </button>
         <RoomList 
           onSelectRoom={(r) => {
             setActiveRoom(r)
@@ -155,7 +165,7 @@ export default function App() {
       )}
 
       {/* Правая панель с чатом */}
-      <div className="flex-1 bg-cover bg-center bg-no-repeat chat-panel">
+      <div className="flex-1 bg-cover bg-center bg-no-repeat chat-panel flex flex-col h-screen overflow-hidden">
         {activeRoom ? (
           <ChatRoom roomId={activeRoom} user={user} />
         ) : (
@@ -164,7 +174,7 @@ export default function App() {
               <div className="text-6xl mb-4">✨</div>
               <div className="text-gray-600 text-lg">
                 Выберите или создайте комнату<br />
-                для интересных бесед
+                для дружеских и иных бесед
               </div>
             </div>
           </div>

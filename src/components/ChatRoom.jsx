@@ -12,7 +12,6 @@ export default function ChatRoom({ roomId, user }) {
   const bottomRef = useRef(null)
   const channelRef = useRef(null)
 
-  // Функция показа уведомления (ДОБАВЛЕНА)
   async function showNotification(message) {
     if (!message || !document.hidden) return
     if (Notification.permission !== 'granted') return
@@ -67,7 +66,6 @@ export default function ChatRoom({ roomId, user }) {
       
       if (payload.eventType === 'INSERT' && payload.new) {
         setMessages(prev => [...prev, payload.new])
-        // ПОКАЗЫВАЕМ УВЕДОМЛЕНИЕ (ДОБАВЛЕНО)
         if (payload.new.user_data?.id !== user.id) {
           showNotification(payload.new)
         }
@@ -214,7 +212,6 @@ export default function ChatRoom({ roomId, user }) {
               className="max-w-full rounded-lg cursor-pointer"
               style={{ maxHeight: '200px' }}
               onClick={() => {
-                // Открываем в модальном окне вместо новой вкладки
                 const modal = document.createElement('div')
                 modal.style.position = 'fixed'
                 modal.style.top = '0'
@@ -247,9 +244,9 @@ export default function ChatRoom({ roomId, user }) {
   }
 
   return (
-    <div className="h-full flex flex-col relative">
-      <div className="p-4 border-b bg-white/90 backdrop-blur-sm">
-        <div className="font-bold text-indigo-600">🐟 Интеллектуальная беседа</div>
+    <div className="h-full flex flex-col">
+      <div className="p-4 border-b bg-white/90 backdrop-blur-sm flex-shrink-0">
+        <div className="font-bold text-indigo-600">🐟 Интересная беседа</div>
       </div>
 
       <div className="flex-1 overflow-auto p-4 space-y-3">
@@ -297,17 +294,17 @@ export default function ChatRoom({ roomId, user }) {
         <div ref={bottomRef} />
       </div>
 
-      <form onSubmit={sendMessage} className="p-4 border-t bg-white/95 backdrop-blur-sm">
+      <form onSubmit={sendMessage} className="p-4 border-t bg-white/95 backdrop-blur-sm flex-shrink-0">
         <div className="flex gap-2">
           <button
             type="button"
             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            className="bg-gray-200 hover:bg-gray-300 px-3 rounded text-xl transition"
+            className="bg-gray-200 hover:bg-gray-300 px-3 rounded text-xl transition flex-shrink-0"
             title="Emoji"
           >
             😊
           </button>
-          <label className="bg-gray-200 hover:bg-gray-300 px-3 rounded cursor-pointer transition relative">
+          <label className="bg-gray-200 hover:bg-gray-300 px-3 rounded cursor-pointer transition relative flex-shrink-0">
             📷
             <input
               type="file"
@@ -323,7 +320,7 @@ export default function ChatRoom({ roomId, user }) {
             )}
           </label>
           <input 
-            className="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white/90" 
+            className="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white/90 min-w-0" 
             value={text} 
             onChange={(e) => setText(e.target.value)} 
             placeholder="Введите сообщение..." 
@@ -331,7 +328,7 @@ export default function ChatRoom({ roomId, user }) {
           />
           <button 
             type="submit"
-            className="bg-indigo-600 text-white px-6 rounded-lg hover:bg-indigo-700 transition disabled:opacity-50"
+            className="bg-indigo-600 text-white px-6 rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 flex-shrink-0"
             disabled={loading || uploading || !text.trim()}
           >
             {loading ? '...' : 'Отправить'}
