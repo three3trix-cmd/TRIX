@@ -1,5 +1,5 @@
 const CACHE_NAME = '3TRIX-chat-v1'
-
+const VAPID_PUBLIC_KEY = 'BI3AUGoFr1k6cBt9zAYrNxLFSqPsncUwqm0viZy5ZORECatIGwCvLbOeDFc6nAdA7TyVFI2zd7Rcr-89Ltwqu94'
 const urlsToCache = [
   '/',
   '/index.html',

@@ -12,6 +12,7 @@ export default function ChatRoom({ roomId, user }) {
   const bottomRef = useRef(null)
   const channelRef = useRef(null)
 
+  // Функция для локального уведомления (когда вкладка открыта)
   async function showNotification(message) {
     if (!message || !document.hidden) return
     if (Notification.permission !== 'granted') return
@@ -35,6 +36,34 @@ export default function ChatRoom({ roomId, user }) {
       }
     } catch (e) {
       console.warn('Notification failed', e)
+    }
+  }
+
+  // Функция для отправки push-уведомления через Edge Function
+  async function sendPushNotification(userId, message) {
+    try {
+      // ЗАМЕНИТЕ НА ВАШ URL SUPABASE!
+      const SUPABASE_URL = 'https://qwhqrlsvanudxykmsetn.supabase.co'
+      
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabase.supabaseKey}`
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          title: `${message.user_data?.name || 'Кто-то'} написал`,
+          body: message.text.length > 100 ? message.text.slice(0, 100) + '...' : message.text,
+          room_id: roomId
+        })
+      })
+      
+      if (!response.ok) {
+        console.error('Push send failed:', await response.text())
+      }
+    } catch (error) {
+      console.error('Push send error:', error)
     }
   }
 
@@ -66,8 +95,12 @@ export default function ChatRoom({ roomId, user }) {
       
       if (payload.eventType === 'INSERT' && payload.new) {
         setMessages(prev => [...prev, payload.new])
+        // Отправляем уведомление только если сообщение не от текущего пользователя
         if (payload.new.user_data?.id !== user.id) {
+          // Локальное уведомление (когда вкладка свернута)
           showNotification(payload.new)
+          // Push-уведомление через Edge Function (для телефона)
+          sendPushNotification(payload.new.user_data?.id, payload.new)
         }
       } else if (payload.eventType === 'DELETE' && payload.old) {
         setMessages(prev => prev.filter(m => m.id !== payload.old.id))
@@ -246,12 +279,12 @@ export default function ChatRoom({ roomId, user }) {
   return (
     <div className="h-full flex flex-col">
       <div className="p-4 border-b bg-white/90 backdrop-blur-sm flex-shrink-0">
-        <div className="font-bold text-indigo-600">🐟 Интересная беседа</div>
+        <div className="text-center font-bold text-indigo-600">🚀 Интересная беседа</div>
       </div>
 
       <div className="flex-1 overflow-auto p-4 space-y-3">
         {messages.length === 0 ? (
-          <div className="text-center text-white/80 mt-10">
+          <div className="text-center text-gray-1000 mt-10">
             🎣 Нет сообщений. Напишите первое! 🐟
           </div>
         ) : (

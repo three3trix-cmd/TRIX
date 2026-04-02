@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react'
 import Login from './components/Login'
 import RoomList from './components/RoomList'
 import ChatRoom from './components/ChatRoom'
-import chatBg from './assets/chat-bg.jpg'
+
+// Прямой путь к картинке
+const chatBg = '/src/assets/chat-bg.jpg'
 
 export default function App() {
   const [user, setUser] = useState(null)
@@ -54,7 +56,7 @@ export default function App() {
     }
     
     if (Notification.permission === 'granted') {
-      new Notification('Уведомления уже включены! 🎣', {
+      new Notification('Уведомления уже включены! 🔥', {
         body: 'Вы будете получать уведомления о новых сообщениях',
         icon: '/icons/icon-192x192.png'
       })
@@ -70,7 +72,7 @@ export default function App() {
     setNotificationStatus(permission)
     
     if (permission === 'granted') {
-      new Notification('Уведомления включены! 🔥', {
+      new Notification('Уведомления включены! 💎', {
         body: 'Теперь вы будете получать уведомления о новых сообщениях',
         icon: '/icons/icon-192x192.png'
       })
@@ -92,7 +94,7 @@ export default function App() {
 
   return (
     <div className="h-screen flex relative">
-      {/* Кнопка меню для мобильных - скрывается когда меню открыто */}
+      {/* Кнопка меню для мобильных */}
       {!menuOpen && (
         <button
           onClick={() => setMenuOpen(true)}
@@ -125,7 +127,7 @@ export default function App() {
         )}
       </div>
 
-      {/* Левая панель с комнатами - адаптивная */}
+      {/* Левая панель */}
       <div className={`fixed md:relative inset-y-0 left-0 w-80 bg-white/95 backdrop-blur-sm flex flex-col z-40 transition-transform duration-300 ${
         menuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
       }`}>
@@ -159,13 +161,19 @@ export default function App() {
         />
       </div>
       
-      {/* Оверлей для мобильного меню */}
+      {/* Оверлей */}
       {menuOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden" onClick={() => setMenuOpen(false)} />
       )}
 
       {/* Правая панель с чатом */}
-      <div className="flex-1 bg-cover bg-center bg-no-repeat chat-panel flex flex-col h-screen overflow-hidden">
+      <div 
+        className="flex-1 bg-cover bg-center bg-no-repeat chat-panel flex flex-col h-screen overflow-hidden"
+        style={{ 
+          backgroundImage: `url(${chatBg})`,
+          backgroundColor: '#0a2f44'
+        }}
+      >
         {activeRoom ? (
           <ChatRoom roomId={activeRoom} user={user} />
         ) : (
