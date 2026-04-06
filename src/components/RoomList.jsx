@@ -4,6 +4,7 @@ import { supabase } from '../firebase'
 export default function RoomList({ onSelectRoom, activeRoom, user }) {
   const [rooms, setRooms] = useState([])
   const [myRoomIds, setMyRoomIds] = useState([])
+  const [unreadCounts, setUnreadCounts] = useState({})
   const [newName, setNewName] = useState('')
   const [isPrivate, setIsPrivate] = useState(false)
   const [password, setPassword] = useState('')
@@ -13,26 +14,33 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
   const [joinPassword, setJoinPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // Загрузка комнат
-  useEffect(() => {
-    loadRooms()
-
-    const channel = supabase
-      .channel('public:rooms')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, () => loadRooms())
-      .subscribe()
-
-    const membersChannel = supabase
-      .channel('public:room_members')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'room_members' }, () => loadRooms())
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-      supabase.removeChannel(membersChannel)
+  // Функция загрузки непрочитанных сообщений
+  async function loadUnreadCounts(roomsList) {
+    const counts = {}
+    const lastRead = JSON.parse(localStorage.getItem('last_read_messages') || '{}')
+    
+    for (const room of roomsList) {
+      // Проверяем, есть ли доступ к комнате
+      const hasAccess = !room.is_private || myRoomIds.includes(room.id)
+      if (!hasAccess) continue
+      
+      const lastReadTime = lastRead[room.id] || new Date(0).toISOString()
+      
+      const { count, error } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('room_id', room.id)
+        .neq('user_data->id', user.id)
+        .gt('timestamp', lastReadTime)
+      
+      if (!error && count > 0) {
+        counts[room.id] = count
+      }
     }
-  }, [user.id])
+    setUnreadCounts(counts)
+  }
 
+  // Загрузка комнат
   async function loadRooms() {
     try {
       // Загружаем все публичные комнаты
@@ -58,16 +66,36 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
         .in('id', memberRoomIds)
         .eq('is_private', true)
       
-      setRooms([...(publicRooms || []), ...(privateRooms || [])])
+      const allRooms = [...(publicRooms || []), ...(privateRooms || [])]
+      setRooms(allRooms)
+      
+      // Загружаем счетчики непрочитанных
+      await loadUnreadCounts(allRooms)
     } catch (err) {
       console.error('Load rooms error:', err)
     }
   }
 
+  // Подписка на изменения
+  useEffect(() => {
+    loadRooms()
+
+    const channel = supabase
+      .channel('rooms-channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, () => loadRooms())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'room_members' }, () => loadRooms())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => loadRooms())
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user.id])
+
   async function createRoom(e) {
     e.preventDefault()
     if (!newName.trim()) {
-      alert('Введите название комнаты')
+      alert('Введите название чата')
       return
     }
     
@@ -100,10 +128,10 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
       setIsPrivate(false)
       setShowCreateModal(false)
       onSelectRoom(data.id)
-      loadRooms()
+      await loadRooms()
     } catch (err) {
       console.error('Create room error:', err)
-      alert('Ошибка создания комнаты: ' + err.message)
+      alert('Ошибка создания чата: ' + err.message)
     } finally {
       setLoading(false)
     }
@@ -111,7 +139,7 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
 
   async function joinPrivateRoom() {
     if (!joinRoomName.trim()) {
-      alert('Введите название комнаты')
+      alert('Введите название чата')
       return
     }
     
@@ -127,7 +155,7 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
         .single()
       
       if (error || !room) {
-        alert('Приватная комната с таким названием не найдена')
+        alert('Приватный чат с таким названием не найдена')
         return
       }
       
@@ -159,17 +187,17 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
       setJoinPassword('')
       setShowJoinModal(false)
       onSelectRoom(room.id)
-      loadRooms()
+      await loadRooms()
     } catch (err) {
       console.error('Join room error:', err)
-      alert('Ошибка присоединения к комнате')
+      alert('Ошибка присоединения к чату')
     } finally {
       setLoading(false)
     }
   }
 
   async function forgetRoom(roomId, roomName) {
-    if (!window.confirm(`Забыть комнату "${roomName}"? Чтобы вернуться, нужно будет снова ввести пароль.`)) {
+    if (!window.confirm(`Забыть чат "${roomName}"? Чтобы вернуться, нужно будет снова ввести пароль.`)) {
       return
     }
     
@@ -184,15 +212,15 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
         onSelectRoom(null)
       }
       
-      loadRooms()
+      await loadRooms()
     } catch (err) {
       console.error('Forget room error:', err)
-      alert('Ошибка при выходе из комнаты')
+      alert('Ошибка при выходе из чата')
     }
   }
 
   async function deleteRoom(roomId, roomName) {
-    if (!window.confirm(`Удалить комнату "${roomName}"? Это действие необратимо.`)) {
+    if (!window.confirm(`Удалить чат "${roomName}"? Это действие необратимо.`)) {
       return
     }
     
@@ -201,11 +229,24 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
       if (activeRoom === roomId) {
         onSelectRoom(null)
       }
-      loadRooms()
+      await loadRooms()
     } catch (err) {
       console.error('Delete room error:', err)
-      alert('Ошибка удаления комнаты')
+      alert('Ошибка удаления чата')
     }
+  }
+
+  // Функция для отметки сообщений как прочитанных при входе в комнату
+  const handleSelectRoom = (roomId) => {
+    // Сохраняем текущее время как время последнего прочтения
+    const lastRead = JSON.parse(localStorage.getItem('last_read_messages') || '{}')
+    lastRead[roomId] = new Date().toISOString()
+    localStorage.setItem('last_read_messages', JSON.stringify(lastRead))
+    
+    // Очищаем счетчик для этой комнаты
+    setUnreadCounts(prev => ({ ...prev, [roomId]: 0 }))
+    
+    onSelectRoom(roomId)
   }
 
   const isMember = (roomId) => {
@@ -221,69 +262,81 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
           onClick={() => setShowCreateModal(true)}
           className="w-full bg-indigo-600 text-white px-3 py-2 rounded hover:bg-indigo-700 transition"
         >
-          + Создать комнату
+          + Создать чат
         </button>
         <button
           onClick={() => setShowJoinModal(true)}
           className="w-full bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 transition"
         >
-          🔑 Присоединиться к приватной
+          🔑 Присоединиться к приватнму чату
         </button>
       </div>
 
       <div className="flex-1 overflow-auto">
         {rooms.length === 0 ? (
           <div className="p-4 text-center text-gray-500">
-            Нет комнат. Создайте первую!
+            Нет чата. Создайте первый!
           </div>
         ) : (
           rooms.map((r) => {
             const member = isMember(r.id)
+            const unread = unreadCounts[r.id] || 0
+            const roomTypeIcon = r.is_private ? '🔒' : '🌐'
+            const roomTypeLabel = r.is_private ? 'Приватная' : 'Публичная'
+            
             return (
               <div 
                 key={r.id} 
                 className={`border-t ${activeRoom === r.id ? 'bg-indigo-50' : ''}`}
               >
                 <div 
-                  onClick={() => member && onSelectRoom(r.id)}
+                  onClick={() => member && handleSelectRoom(r.id)}
                   className={`p-3 cursor-pointer transition ${!member ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'}`}
                 >
                   <div className="flex justify-between items-center">
                     <div className="flex-1">
-                      <div className="font-medium">
-                        {r.name}
-                        {r.is_private && ' 🔒'}
-                        {!member && ' (нет доступа)'}
+                      <div className="font-medium flex items-center gap-2">
+                        <span title={roomTypeLabel}>{roomTypeIcon}</span>
+                        <span>{r.name}</span>
+                        {!member && <span className="text-xs text-gray-400">(нет доступа)</span>}
                       </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {r.id.slice(0, 8)}...
+                      <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                        <span>{r.id.slice(0, 8)}...</span>
+                        {r.is_private && member && <span className="text-orange-500">🔐 участник</span>}
                       </div>
                     </div>
-                    <div className="flex gap-1">
-                      {r.is_private && member && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            forgetRoom(r.id, r.name)
-                          }}
-                          className="text-xs bg-orange-500 text-white px-2 py-1 rounded hover:bg-orange-600 transition"
-                          title="Забыть комнату"
-                        >
-                          🚪
-                        </button>
+                    <div className="flex items-center gap-2">
+                      {unread > 0 && member && (
+                        <span className="bg-red-500 text-white text-xs rounded-full px-2 py-0.5 min-w-[20px] text-center animate-bounce">
+                          {unread > 99 ? '99+' : unread}
+                        </span>
                       )}
-                      {r.user_id === user.id && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            deleteRoom(r.id, r.name)
-                          }}
-                          className="text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 transition"
-                          title="Удалить комнату"
-                        >
-                          🗑️
-                        </button>
-                      )}
+                      <div className="flex gap-1">
+                        {r.is_private && member && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              forgetRoom(r.id, r.name)
+                            }}
+                            className="text-xs bg-orange-500 text-white px-2 py-1 rounded hover:bg-orange-600 transition"
+                            title="Забыть комнату"
+                          >
+                            🚪
+                          </button>
+                        )}
+                        {r.user_id === user.id && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              deleteRoom(r.id, r.name)
+                            }}
+                            className="text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 transition"
+                            title="Удалить чат"
+                          >
+                            🗑️
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -297,12 +350,12 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-96 max-w-[90%]">
-            <h3 className="text-lg font-bold mb-4">Создать комнату</h3>
+            <h3 className="text-lg font-bold mb-4">Создать чат</h3>
             <input
               type="text"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="Название комнаты"
+              placeholder="Название чата"
               className="w-full border rounded-lg px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               autoFocus
               onKeyPress={(e) => e.key === 'Enter' && createRoom(e)}
@@ -314,14 +367,14 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
                 onChange={(e) => setIsPrivate(e.target.checked)}
                 className="mr-2"
               />
-              Приватная комната (нужен пароль)
+              Приватный чат (нужен пароль)
             </label>
             {isPrivate && (
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Пароль комнаты"
+                placeholder="Пароль от чата"
                 className="w-full border rounded-lg px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             )}
@@ -353,12 +406,12 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
       {showJoinModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-96 max-w-[90%]">
-            <h3 className="text-lg font-bold mb-4">Присоединиться к приватной комнате</h3>
+            <h3 className="text-lg font-bold mb-4">Присоединиться к приватному чату</h3>
             <input
               type="text"
               value={joinRoomName}
               onChange={(e) => setJoinRoomName(e.target.value)}
-              placeholder="Название комнаты"
+              placeholder="Название чата"
               className="w-full border rounded-lg px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               autoFocus
             />
@@ -366,7 +419,7 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
               type="password"
               value={joinPassword}
               onChange={(e) => setJoinPassword(e.target.value)}
-              placeholder="Пароль комнаты"
+              placeholder="Пароль чата"
               className="w-full border rounded-lg px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               onKeyPress={(e) => e.key === 'Enter' && joinPrivateRoom()}
             />

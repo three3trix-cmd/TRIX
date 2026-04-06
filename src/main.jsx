@@ -4,27 +4,58 @@ import App from './App'
 import './index.css'
 import { supabase } from './firebase'
 
-// VAPID публичный ключ (из вашей генерации)
-const VAPID_PUBLIC_KEY = 'BI3AUGoFr1k6cBt9zAYrNxLFSqPsncUwqm0viZy5ZORECatIGwCvLbOeDFc6nAdA7TyVFI2zd7Rcr-89Ltwqu94'
+// Получаем ключи из переменных окружения
+const ONESIGNAL_APP_ID = import.meta.env.VITE_ONESIGNAL_APP_ID
+const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then(async (registration) => {
-        console.log('[PWA] Service Worker зарегистрирован')
-        
-        // Запрос разрешения на уведомления
-        const permission = await Notification.requestPermission()
-        if (permission === 'granted') {
-          await subscribeToPushNotifications(registration)
-        }
-      })
-      .catch((error) => {
-        console.error('[PWA] Ошибка регистрации Service Worker:', error)
-      })
+// Функция инициализации OneSignal
+async function initOneSignal() {
+  if (typeof window === 'undefined') return
+  if (window.OneSignal) return
+  
+  window.OneSignalDeferred = window.OneSignalDeferred || []
+  window.OneSignalDeferred.push(function(OneSignal) {
+    OneSignal.init({
+      appId: ONESIGNAL_APP_ID,
+      allowLocalhostAsSecureOrigin: true,
+      notifyButton: {
+        enable: false, // Отключаем встроенную кнопку (у нас своя)
+      },
+    })
   })
+  
+  console.log('[OneSignal] Инициализирован с App ID:', ONESIGNAL_APP_ID)
 }
 
+// Запрос разрешения на уведомления
+async function requestNotificationPermission() {
+  const permission = await Notification.requestPermission()
+  if (permission === 'granted') {
+    console.log('[PWA] Уведомления разрешены')
+    return true
+  }
+  return false
+}
+
+// Функция для подписки на push (OneSignal)
+async function subscribeToOneSignal() {
+  if (!window.OneSignal) return
+  
+  try {
+    const user = JSON.parse(localStorage.getItem('anon_user') || '{}')
+    if (user.id) {
+      await window.OneSignal.setExternalUserId(user.id)
+      console.log('[OneSignal] Внешний ID установлен:', user.id)
+    }
+    
+    await window.OneSignal.User.PushSubscription.optIn()
+    console.log('[OneSignal] Подписка создана')
+  } catch (error) {
+    console.error('[OneSignal] Ошибка подписки:', error)
+  }
+}
+
+// Функция для подписки на push (VAPID)
 async function subscribeToPushNotifications(registration) {
   try {
     const subscription = await registration.pushManager.subscribe({
@@ -32,7 +63,7 @@ async function subscribeToPushNotifications(registration) {
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
     })
     
-    console.log('[PWA] Push-подписка создана')
+    console.log('[PWA] VAPID Push-подписка создана')
     
     const user = JSON.parse(localStorage.getItem('anon_user') || '{}')
     if (user.id) {
@@ -42,7 +73,7 @@ async function subscribeToPushNotifications(registration) {
       })
     }
   } catch (error) {
-    console.error('[PWA] Ошибка подписки:', error)
+    console.error('[PWA] Ошибка VAPID подписки:', error)
   }
 }
 
@@ -55,6 +86,32 @@ function urlBase64ToUint8Array(base64String) {
     outputArray[i] = rawData.charCodeAt(i)
   }
   return outputArray
+}
+
+// Регистрация Service Worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(async (registration) => {
+        console.log('[PWA] Service Worker зарегистрирован')
+        
+        // Инициализируем OneSignal
+        await initOneSignal()
+        
+        // Запрашиваем разрешение на уведомления
+        const granted = await requestNotificationPermission()
+        
+        if (granted) {
+          // Подписываемся на OneSignal
+          await subscribeToOneSignal()
+          // Подписываемся на VAPID
+          await subscribeToPushNotifications(registration)
+        }
+      })
+      .catch((error) => {
+        console.error('[PWA] Ошибка регистрации Service Worker:', error)
+      })
+  })
 }
 
 createRoot(document.getElementById('root')).render(<App />)

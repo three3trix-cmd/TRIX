@@ -1,9 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 
-// ВРЕМЕННО используйте эти ключи для теста
-// ПОТОМ ЗАМЕНИТЕ НА СВОИ!
-const SUPABASE_URL = 'https://qwhqrlsvanudxykmsetn.supabase.co'
-const SUPABASE_ANON_KEY = 'sb_publishable_aNrJKmO5lf5sIYN0HLOWXQ_DED8Rei-'
+// Получаем ключи из переменных окружения
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 

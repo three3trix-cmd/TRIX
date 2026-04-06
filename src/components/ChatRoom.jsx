@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { supabase, subscribeToRoomMessages } from '../firebase'
 import EmojiPicker from 'emoji-picker-react'
+import OneSignal from 'react-onesignal'
 
 export default function ChatRoom({ roomId, user }) {
   const [messages, setMessages] = useState([])
@@ -39,10 +40,39 @@ export default function ChatRoom({ roomId, user }) {
     }
   }
 
-  // Функция для отправки push-уведомления через Edge Function
+  // Функция для отправки push-уведомления через OneSignal
+  async function sendOneSignalNotification(userId, message) {
+    try {
+      // Проверяем, что OneSignal загружен
+      if (!window.OneSignal) {
+        console.warn('[OneSignal] Не инициализирован')
+        return
+      }
+      
+      await window.OneSignal.Notifications.send({
+        contents: {
+          en: message.text.length > 100 ? message.text.slice(0, 100) + '...' : message.text
+        },
+        headings: {
+          en: `${message.user_data?.name || 'Кто-то'} написал`
+        },
+        include_external_user_ids: [userId],
+        data: {
+          room_id: roomId,
+          url: '/'
+        },
+        icon: 'https://trix-woad.vercel.app/icons/icon-192x192.png'
+      })
+      console.log('[OneSignal] Уведомление отправлено пользователю:', userId)
+    } catch (error) {
+      console.error('[OneSignal] Ошибка отправки:', error)
+    }
+  }
+
+  // ⚠️ Функция для отправки push-уведомления через Edge Function (ЗАКОММЕНТИРОВАНА)
+  /*
   async function sendPushNotification(userId, message) {
     try {
-      // ЗАМЕНИТЕ НА ВАШ URL SUPABASE!
       const SUPABASE_URL = 'https://qwhqrlsvanudxykmsetn.supabase.co'
       
       const response = await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
@@ -66,6 +96,7 @@ export default function ChatRoom({ roomId, user }) {
       console.error('Push send error:', error)
     }
   }
+  */
 
   useEffect(() => {
     if (!roomId) return
@@ -99,8 +130,10 @@ export default function ChatRoom({ roomId, user }) {
         if (payload.new.user_data?.id !== user.id) {
           // Локальное уведомление (когда вкладка свернута)
           showNotification(payload.new)
-          // Push-уведомление через Edge Function (для телефона)
-          sendPushNotification(payload.new.user_data?.id, payload.new)
+          // Push-уведомление через OneSignal (для телефона)
+          sendOneSignalNotification(payload.new.user_data?.id, payload.new)
+          // Edge Function закомментирована, используем OneSignal
+          // sendPushNotification(payload.new.user_data?.id, payload.new)
         }
       } else if (payload.eventType === 'DELETE' && payload.old) {
         setMessages(prev => prev.filter(m => m.id !== payload.old.id))
@@ -284,7 +317,7 @@ export default function ChatRoom({ roomId, user }) {
 
       <div className="flex-1 overflow-auto p-4 space-y-3">
         {messages.length === 0 ? (
-          <div className="text-center text-gray-1000 mt-10">
+          <div className="text-center text-gray-500 mt-10">
             🎣 Нет сообщений. Напишите первое! 🐟
           </div>
         ) : (
