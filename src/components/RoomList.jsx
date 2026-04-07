@@ -14,7 +14,7 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
   const [joinPassword, setJoinPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // Функция загрузки непрочитанных сообщений
+  // ИСПРАВЛЕНИЕ: Функция загрузки непрочитанных сообщений
   async function loadUnreadCounts(roomsList) {
     const counts = {}
     const lastRead = JSON.parse(localStorage.getItem('last_read_messages') || '{}')
@@ -26,15 +26,16 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
       
       const lastReadTime = lastRead[room.id] || new Date(0).toISOString()
       
+      // ИСПРАВЛЕНИЕ: Используем правильный синтаксис для count
       const { count, error } = await supabase
         .from('messages')
         .select('*', { count: 'exact', head: true })
         .eq('room_id', room.id)
-        .neq('user_data->id', user.id)
+        .neq('user_data->>id', user.id)  // ИСПРАВЛЕНИЕ: Правильный синтаксис для JSON поля
         .gt('timestamp', lastReadTime)
       
-      if (!error && count > 0) {
-        counts[room.id] = count
+      if (!error) {
+        counts[room.id] = count || 0
       }
     }
     setUnreadCounts(counts)
@@ -67,10 +68,15 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
         .eq('is_private', true)
       
       const allRooms = [...(publicRooms || []), ...(privateRooms || [])]
-      setRooms(allRooms)
+      // ИСПРАВЛЕНИЕ: Убираем дубликаты комнат
+      const uniqueRooms = allRooms.filter((room, index, self) => 
+        index === self.findIndex(r => r.id === room.id)
+      )
+      
+      setRooms(uniqueRooms)
       
       // Загружаем счетчики непрочитанных
-      await loadUnreadCounts(allRooms)
+      await loadUnreadCounts(uniqueRooms)
     } catch (err) {
       console.error('Load rooms error:', err)
     }
@@ -84,7 +90,12 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
       .channel('rooms-channel')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, () => loadRooms())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'room_members' }, () => loadRooms())
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => loadRooms())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+        // ИСПРАВЛЕНИЕ: Обновляем счетчики только для комнаты с новым сообщением
+        if (payload.new && payload.new.room_id) {
+          loadUnreadCounts(rooms)
+        }
+      })
       .subscribe()
 
     return () => {
@@ -236,7 +247,7 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
     }
   }
 
-  // Функция для отметки сообщений как прочитанных при входе в комнату
+ // Функция для отметки сообщений как прочитанных при входе в комнату
   const handleSelectRoom = (roomId) => {
     // Сохраняем текущее время как время последнего прочтения
     const lastRead = JSON.parse(localStorage.getItem('last_read_messages') || '{}')

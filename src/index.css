@@ -11,12 +11,60 @@
   }
 }
 
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
 .animate-bounce {
   animation: bounce 0.5s ease;
 }
 
+.animate-pulse-slow {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
 html, body, #root {
   height: 100%;
+}
+
+/* Стили для скроллбара */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(79, 70, 229, 0.3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(79, 70, 229, 0.5);
 }
 
 /* Адаптация для мобильных устройств */
@@ -52,5 +100,36 @@ html, body, #root {
     padding: 8px 12px;
     border-radius: 8px;
     font-size: 14px;
+  }
+  
+  /* Улучшенный тап-таргет для мобильных */
+  button, 
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Стили для уведомлений в PWA */
+.notification-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  max-width: 350px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Safe area для iOS */
+@supports (padding: max(0px)) {
+  .safe-top {
+    padding-top: max(12px, env(safe-area-inset-top));
+  }
+  
+  .safe-bottom {
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
   }
 }

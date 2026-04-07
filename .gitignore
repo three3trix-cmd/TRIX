@@ -24,9 +24,13 @@ dist-ssr
 # Vercel
 .vercel
 
+# Supabase
+.supabase
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
 .idea
 .DS_Store
 *.suo
@@ -38,3 +42,7 @@ dist-ssr
 # OS files
 Thumbs.db
 Desktop.ini
+
+# Debug
+*.log
+.cache/

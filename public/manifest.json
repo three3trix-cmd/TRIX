@@ -1,12 +1,14 @@
 {
-  "name": "3Trix -  независимый чат",
+  "name": "3Trix - независимый чат",
   "short_name": "3Trix",
   "description": "Увлекательный чат для общения и обмена опытом",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#4f46e5",
   "theme_color": "#4f46e5",
   "orientation": "portrait",
+  "categories": ["social", "messaging", "chat"],
   "icons": [
     {
       "src": "/icons/icon-72x72.png",
@@ -49,6 +51,20 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "/screenshots/mobile.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow"
     }
   ]
 }

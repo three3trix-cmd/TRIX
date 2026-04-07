@@ -3,8 +3,280 @@ import Login from './components/Login'
 import RoomList from './components/RoomList'
 import ChatRoom from './components/ChatRoom'
 
-// Прямой путь к картинке
 const chatBg = '/src/assets/chat-bg.jpg'
+
+// Компонент с инструкциями по настройке уведомлений
+function NotificationInstructions({ onClose }) {
+  const [deviceInfo, setDeviceInfo] = useState({ os: 'unknown', browser: 'unknown' })
+  
+  useEffect(() => {
+    detectDevice()
+  }, [])
+  
+  const detectDevice = () => {
+    const ua = navigator.userAgent
+    let os = 'unknown'
+    let browser = 'unknown'
+    
+    // Определение ОС
+    if (/iPhone|iPad|iPod/i.test(ua)) {
+      os = 'ios'
+    } else if (/Android/i.test(ua)) {
+      os = 'android'
+      // Определение производителя Android
+      if (/Xiaomi|Redmi/i.test(ua)) os = 'xiaomi'
+      else if (/Huawei|Honor/i.test(ua)) os = 'huawei'
+      else if (/Samsung|SM-/i.test(ua)) os = 'samsung'
+      else if (/OPPO|CPH/i.test(ua)) os = 'oppo'
+    } else if (/Windows/i.test(ua)) {
+      os = 'windows'
+    } else if (/Mac/i.test(ua)) {
+      os = 'mac'
+    } else if (/Linux/i.test(ua)) {
+      os = 'linux'
+    }
+    
+    // Определение браузера
+    if (/Chrome/i.test(ua) && !/Edg/i.test(ua)) browser = 'chrome'
+    else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) browser = 'safari'
+    else if (/Firefox/i.test(ua)) browser = 'firefox'
+    else if (/Edg/i.test(ua)) browser = 'edge'
+    else if (/SamsungBrowser/i.test(ua)) browser = 'samsung'
+    
+    setDeviceInfo({ os, browser })
+  }
+  
+  const renderInstructions = () => {
+    const { os, browser } = deviceInfo
+    
+    // iOS + Safari
+    if (os === 'ios' && browser === 'safari') {
+      return (
+        <>
+          <h3 className="text-lg font-bold text-indigo-600 mb-3">📱 Настройка уведомлений на iPhone/iPad</h3>
+          <ol className="list-decimal list-inside space-y-2 text-sm">
+            <li className="font-medium">Установите приложение на домашний экран:
+              <ul className="list-disc list-inside ml-4 mt-1 text-gray-600 font-normal">
+                <li>Нажмите кнопку <span className="inline-flex items-center px-2 py-0.5 bg-gray-100 rounded">Поделиться</span> (квадрат со стрелкой ↑)</li>
+                <li>Прокрутите вниз и выберите <span className="inline-flex items-center px-2 py-0.5 bg-gray-100 rounded">На экран «Домой»</span></li>
+                <li>Нажмите <span className="inline-flex items-center px-2 py-0.5 bg-gray-100 rounded">Добавить</span></li>
+              </ul>
+            </li>
+            <li className="font-medium">Откройте приложение с домашнего экрана (НЕ из Safari!)</li>
+            <li className="font-medium">Нажмите кнопку «🔔 Включить уведомления» в приложении</li>
+          </ol>
+          <div className="mt-3 p-3 bg-yellow-50 rounded-lg text-xs border border-yellow-200">
+            <p className="font-medium text-yellow-800">⚠️ Важно для пользователей из ЕС:</p>
+            <p className="text-yellow-700 mt-1">Из-за ограничений Apple, уведомления в PWA не работают в странах Евросоюза. Это ограничение невозможно обойти технически.</p>
+          </div>
+        </>
+      )
+    }
+    
+    // iOS + другой браузер
+    if (os === 'ios') {
+      return (
+        <>
+          <h3 className="text-lg font-bold text-indigo-600 mb-3">📱 Настройка уведомлений на iPhone/iPad</h3>
+          <div className="p-3 bg-blue-50 rounded-lg text-sm border border-blue-200 mb-3">
+            <p className="font-medium text-blue-800">Для работы уведомлений используйте Safari</p>
+            <p className="text-blue-700 mt-1">Другие браузеры на iOS (Chrome, Firefox, Edge) не поддерживают push-уведомления из-за ограничений Apple.</p>
+          </div>
+          <ol className="list-decimal list-inside space-y-2 text-sm">
+            <li>Откройте сайт в браузере Safari</li>
+            <li>Следуйте инструкции для Safari выше</li>
+          </ol>
+        </>
+      )
+    }
+    
+    // Xiaomi
+    if (os === 'xiaomi') {
+      return (
+        <>
+          <h3 className="text-lg font-bold text-indigo-600 mb-3">📱 Настройка уведомлений на Xiaomi (MIUI)</h3>
+          <ol className="list-decimal list-inside space-y-2 text-sm">
+            <li className="font-medium">Отключите оптимизацию батареи:
+              <ul className="list-disc list-inside ml-4 mt-1 text-gray-600 font-normal">
+                <li>Зайдите в <span className="font-mono bg-gray-100 px-1">Настройки</span> → <span className="font-mono bg-gray-100 px-1">Приложения</span> → <span className="font-mono bg-gray-100 px-1">Управление приложениями</span></li>
+                <li>Найдите <span className="font-medium">3TRIX</span> (или ваш браузер)</li>
+                <li>Нажмите <span className="font-mono bg-gray-100 px-1">Экономия энергии</span> → выберите <span className="font-medium">«Нет ограничений»</span></li>
+              </ul>
+            </li>
+            <li className="font-medium">Включите автозапуск:
+              <ul className="list-disc list-inside ml-4 mt-1 text-gray-600 font-normal">
+                <li>В настройках приложения включите <span className="font-medium">«Автозапуск»</span></li>
+              </ul>
+            </li>
+            <li className="font-medium">Нажмите кнопку «🔔 Включить уведомления» выше</li>
+          </ol>
+          <div className="mt-3 p-3 bg-gray-50 rounded-lg text-xs">
+            <p className="font-medium">💡 Совет:</p>
+            <p>Закрепите приложение в списке недавних (проведите вниз по карточке приложения и нажмите на замочек 🔒)</p>
+          </div>
+        </>
+      )
+    }
+    
+    // Huawei
+    if (os === 'huawei') {
+      return (
+        <>
+          <h3 className="text-lg font-bold text-indigo-600 mb-3">📱 Настройка уведомлений на Huawei (HarmonyOS/EMUI)</h3>
+          <ol className="list-decimal list-inside space-y-2 text-sm">
+            <li className="font-medium">Настройте запуск приложения:
+              <ul className="list-disc list-inside ml-4 mt-1 text-gray-600 font-normal">
+                <li><span className="font-mono bg-gray-100 px-1">Настройки</span> → <span className="font-mono bg-gray-100 px-1">Приложения</span> → <span className="font-mono bg-gray-100 px-1">Запуск приложений</span></li>
+                <li>Найдите <span className="font-medium">3TRIX</span> (или браузер)</li>
+                <li>Отключите <span className="font-medium">«Управлять автоматически»</span></li>
+                <li>Включите все три переключателя: <span className="font-medium">Автозапуск, Косвенный запуск, Фоновый запуск</span></li>
+              </ul>
+            </li>
+            <li className="font-medium">Отключите оптимизацию батареи:
+              <ul className="list-disc list-inside ml-4 mt-1 text-gray-600 font-normal">
+                <li>В настройках приложения → <span className="font-mono bg-gray-100 px-1">Батарея</span> → выберите <span className="font-medium">«Не оптимизировать»</span></li>
+              </ul>
+            </li>
+          </ol>
+        </>
+      )
+    }
+    
+    // Samsung
+    if (os === 'samsung') {
+      return (
+        <>
+          <h3 className="text-lg font-bold text-indigo-600 mb-3">📱 Настройка уведомлений на Samsung</h3>
+          <ol className="list-decimal list-inside space-y-2 text-sm">
+            <li className="font-medium">Отключите оптимизацию батареи:
+              <ul className="list-disc list-inside ml-4 mt-1 text-gray-600 font-normal">
+                <li><span className="font-mono bg-gray-100 px-1">Настройки</span> → <span className="font-mono bg-gray-100 px-1">Приложения</span> → выберите браузер</li>
+                <li><span className="font-mono bg-gray-100 px-1">Батарея</span> → выберите <span className="font-medium">«Без ограничений»</span></li>
+              </ul>
+            </li>
+            <li className="font-medium">Добавьте в исключения режима сна:
+              <ul className="list-disc list-inside ml-4 mt-1 text-gray-600 font-normal">
+                <li><span className="font-mono bg-gray-100 px-1">Настройки</span> → <span className="font-mono bg-gray-100 px-1">Обслуживание устройства</span> → <span className="font-mono bg-gray-100 px-1">Батарея</span></li>
+                <li><span className="font-mono bg-gray-100 px-1">Фоновые приложения</span> → добавьте в «Приложения в спящем режиме НИКОГДА»</li>
+              </ul>
+            </li>
+          </ol>
+        </>
+      )
+    }
+    
+    // OPPO/Realme/OnePlus
+    if (os === 'oppo') {
+      return (
+        <>
+          <h3 className="text-lg font-bold text-indigo-600 mb-3">📱 Настройка уведомлений на OPPO/Realme/OnePlus (ColorOS)</h3>
+          <ol className="list-decimal list-inside space-y-2 text-sm">
+            <li className="font-medium">Разрешите фоновую работу:
+              <ul className="list-disc list-inside ml-4 mt-1 text-gray-600 font-normal">
+                <li><span className="font-mono bg-gray-100 px-1">Настройки</span> → <span className="font-mono bg-gray-100 px-1">Приложения</span> → <span className="font-mono bg-gray-100 px-1">Автозапуск</span></li>
+                <li>Включите для браузера или установленного приложения</li>
+              </ul>
+            </li>
+            <li className="font-medium">Отключите оптимизацию:
+              <ul className="list-disc list-inside ml-4 mt-1 text-gray-600 font-normal">
+                <li>В настройках приложения → <span className="font-mono bg-gray-100 px-1">Экономия энергии</span> → <span className="font-medium">«Разрешить фоновую работу»</span></li>
+              </ul>
+            </li>
+            <li className="font-medium">Закрепите в недавних:
+              <ul className="list-disc list-inside ml-4 mt-1 text-gray-600 font-normal">
+                <li>Откройте список недавних приложений (кнопка ≡)</li>
+                <li>Проведите вниз по карточке и нажмите на замочек 🔒</li>
+              </ul>
+            </li>
+          </ol>
+        </>
+      )
+    }
+    
+    // Android (общие инструкции)
+    if (os === 'android') {
+      return (
+        <>
+          <h3 className="text-lg font-bold text-indigo-600 mb-3">📱 Настройка уведомлений на Android</h3>
+          <ol className="list-decimal list-inside space-y-2 text-sm">
+            <li className="font-medium">Проверьте настройки браузера:
+              <ul className="list-disc list-inside ml-4 mt-1 text-gray-600 font-normal">
+                <li>Зайдите в <span className="font-mono bg-gray-100 px-1">Настройки Android</span> → <span className="font-mono bg-gray-100 px-1">Приложения</span> → найдите ваш браузер</li>
+                <li>Убедитесь, что уведомления разрешены</li>
+              </ul>
+            </li>
+            <li className="font-medium">Отключите оптимизацию батареи для браузера:
+              <ul className="list-disc list-inside ml-4 mt-1 text-gray-600 font-normal">
+                <li><span className="font-mono bg-gray-100 px-1">Батарея</span> или <span className="font-mono bg-gray-100 px-1">Экономия энергии</span> → <span className="font-medium">«Без ограничений»</span></li>
+              </ul>
+            </li>
+            <li className="font-medium">Для максимальной надежности — установите PWA:
+              <ul className="list-disc list-inside ml-4 mt-1 text-gray-600 font-normal">
+                <li>Нажмите на кнопку <span className="inline-flex items-center px-2 py-0.5 bg-gray-100 rounded">📱 Установить</span> в правом верхнем углу</li>
+              </ul>
+            </li>
+          </ol>
+          <div className="mt-3 p-3 bg-gray-50 rounded-lg text-xs">
+            <p className="font-medium">💡 Важно:</p>
+            <p>Некоторые производители могут иметь дополнительные настройки энергосбережения. Если уведомления не приходят — проверьте приложение вашего производителя (Mi Security, Phone Manager и т.д.)</p>
+          </div>
+        </>
+      )
+    }
+    
+    // Desktop
+    return (
+      <>
+        <h3 className="text-lg font-bold text-indigo-600 mb-3">💻 Настройка уведомлений на компьютере</h3>
+        <ol className="list-decimal list-inside space-y-2 text-sm">
+          <li className="font-medium">Разрешите уведомления в браузере:
+            <ul className="list-disc list-inside ml-4 mt-1 text-gray-600 font-normal">
+              <li>Нажмите на значок замка 🔒 слева от адресной строки</li>
+              <li>Найдите «Уведомления» и выберите <span className="font-medium">«Разрешить»</span></li>
+            </ul>
+          </li>
+          <li className="font-medium">В Windows 10/11 проверьте Focus Assist:
+            <ul className="list-disc list-inside ml-4 mt-1 text-gray-600 font-normal">
+              <li>Убедитесь, что режим «Не беспокоить» отключен</li>
+            </ul>
+          </li>
+          <li className="font-medium">В macOS проверьте настройки уведомлений:
+            <ul className="list-disc list-inside ml-4 mt-1 text-gray-600 font-normal">
+              <li><span className="font-mono bg-gray-100 px-1">Системные настройки</span> → <span className="font-mono bg-gray-100 px-1">Уведомления</span> → найдите ваш браузер</li>
+            </ul>
+          </li>
+        </ol>
+      </>
+    )
+  }
+  
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-start mb-4">
+          <h2 className="text-xl font-bold">🔔 Настройка уведомлений</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-2xl"
+          >
+            ✕
+          </button>
+        </div>
+        
+        {renderInstructions()}
+        
+        <div className="mt-4 pt-4 border-t">
+          <button
+            onClick={onClose}
+            className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
+          >
+            Понятно, спасибо!
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function App() {
   const [user, setUser] = useState(null)
@@ -13,6 +285,7 @@ export default function App() {
   const [showInstallButton, setShowInstallButton] = useState(false)
   const [notificationStatus, setNotificationStatus] = useState('default')
   const [menuOpen, setMenuOpen] = useState(false)
+  const [showInstructions, setShowInstructions] = useState(false)
 
   useEffect(() => {
     if ('Notification' in window) {
@@ -60,11 +333,13 @@ export default function App() {
         body: 'Вы будете получать уведомления о новых сообщениях',
         icon: '/icons/icon-192x192.png'
       })
+      // Показываем инструкции даже если уведомления уже включены
+      setShowInstructions(true)
       return
     }
     
     if (Notification.permission === 'denied') {
-      alert('🔕 Уведомления запрещены!\n\nЧтобы включить:\n1️⃣ Нажмите на значок замка 🔒 слева от адреса\n2️⃣ Выберите "Настройки сайта"\n3️⃣ Найдите "Уведомления" → выберите "Разрешить"\n4️⃣ Обновите страницу')
+      setShowInstructions(true)
       return
     }
     
@@ -76,6 +351,10 @@ export default function App() {
         body: 'Теперь вы будете получать уведомления о новых сообщениях',
         icon: '/icons/icon-192x192.png'
       })
+      // Показываем инструкции для настройки устройства
+      setShowInstructions(true)
+    } else {
+      setShowInstructions(true)
     }
   }
 
@@ -106,16 +385,14 @@ export default function App() {
       
       {/* Кнопки в правом верхнем углу */}
       <div className="absolute top-4 right-4 z-50 flex gap-2">
-        {showNotificationButton && (
-          <button
-            onClick={handleRequestNotification}
-            className={`px-3 py-2 rounded-lg shadow-lg transition text-sm font-medium ${
-              notificationStatus === 'denied' ? 'bg-red-500 hover:bg-red-600' : 'bg-yellow-500 hover:bg-yellow-600'
-            } text-white`}
-          >
-            {getNotificationButtonText()}
-          </button>
-        )}
+        <button
+          onClick={handleRequestNotification}
+          className={`px-3 py-2 rounded-lg shadow-lg transition text-sm font-medium ${
+            notificationStatus === 'denied' ? 'bg-red-500 hover:bg-red-600' : 'bg-yellow-500 hover:bg-yellow-600'
+          } text-white`}
+        >
+          {getNotificationButtonText()}
+        </button>
         
         {showInstallButton && (
           <button
@@ -188,6 +465,11 @@ export default function App() {
           </div>
         )}
       </div>
+      
+      {/* Модальное окно с инструкциями */}
+      {showInstructions && (
+        <NotificationInstructions onClose={() => setShowInstructions(false)} />
+      )}
     </div>
   )
 }
