@@ -3,7 +3,8 @@ import Login from './components/Login'
 import RoomList from './components/RoomList'
 import ChatRoom from './components/ChatRoom'
 
-const chatBg = '/src/assets/chat-bg.jpg'
+// ИСПРАВЛЕНИЕ: Правильный путь к фону
+const chatBg = '/images/chat-bg.jpg'
 
 // Компонент с инструкциями по настройке уведомлений
 function NotificationInstructions({ onClose }) {
@@ -298,78 +299,119 @@ export default function App() {
       setUser(userData)
     }
     
-    window.addEventListener('beforeinstallprompt', (e) => {
+    const handleBeforeInstallPrompt = (e) => {
       e.preventDefault()
       setDeferredPrompt(e)
       setShowInstallButton(true)
-    })
+    }
     
-    window.addEventListener('appinstalled', () => {
+    const handleAppInstalled = () => {
       setShowInstallButton(false)
       setDeferredPrompt(null)
-    })
+      console.log('PWA установлено')
+    }
+    
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    window.addEventListener('appinstalled', handleAppInstalled)
+    
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+      window.removeEventListener('appinstalled', handleAppInstalled)
+    }
   }, [])
 
+  // ИСПОЛЬЗУЕТСЯ: Функция установки PWA
   const handleInstall = async () => {
-    if (deferredPrompt) {
+    if (!deferredPrompt) {
+      alert('Приложение уже установлено или функция недоступна')
+      return
+    }
+    
+    try {
       deferredPrompt.prompt()
       const { outcome } = await deferredPrompt.userChoice
+      
       if (outcome === 'accepted') {
-        console.log('Приложение установлено')
+        console.log('PWA установлено пользователем')
+        setShowInstallButton(false)
       }
+    } catch (error) {
+      console.error('Ошибка установки:', error)
+    } finally {
       setDeferredPrompt(null)
-      setShowInstallButton(false)
     }
   }
 
+  // ИСПОЛЬЗУЕТСЯ: Функция запроса уведомлений
   const handleRequestNotification = async () => {
     if (!('Notification' in window)) {
       alert('Ваш браузер не поддерживает уведомления')
       return
     }
     
+    // Если уже разрешены - показываем инструкции
     if (Notification.permission === 'granted') {
-      new Notification('Уведомления уже включены! 🔥', {
-        body: 'Вы будете получать уведомления о новых сообщениях',
-        icon: '/icons/icon-192x192.png'
-      })
-      // Показываем инструкции даже если уведомления уже включены
       setShowInstructions(true)
+      
+      // На десктопе показываем тестовое уведомление
+      if (!/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+        try {
+          const registration = await navigator.serviceWorker.getRegistration()
+          if (registration) {
+            registration.showNotification('Уведомления уже включены! 🔥', {
+              body: 'Вы будете получать уведомления о новых сообщениях',
+              icon: '/icons/icon-192x192.png',
+              badge: '/icons/icon-72x72.png'
+            })
+          }
+        } catch (e) {
+          console.warn('Не удалось показать тестовое уведомление:', e)
+        }
+      }
       return
     }
     
+    // Если запрещены - показываем инструкции как включить
     if (Notification.permission === 'denied') {
       setShowInstructions(true)
       return
     }
     
-    const permission = await Notification.requestPermission()
-    setNotificationStatus(permission)
-    
-    if (permission === 'granted') {
-      new Notification('Уведомления включены! 💎', {
-        body: 'Теперь вы будете получать уведомления о новых сообщениях',
-        icon: '/icons/icon-192x192.png'
-      })
-      // Показываем инструкции для настройки устройства
+    // Запрашиваем разрешение
+    try {
+      const permission = await Notification.requestPermission()
+      setNotificationStatus(permission)
+      
+      // Всегда показываем инструкции после запроса
       setShowInstructions(true)
-    } else {
+      
+      if (permission === 'granted') {
+        console.log('[PWA] Уведомления разрешены')
+      }
+    } catch (error) {
+      console.error('Ошибка запроса разрешения:', error)
       setShowInstructions(true)
     }
   }
 
+  // ИСПОЛЬЗУЕТСЯ: Функция выхода
   const handleLogout = () => {
     if (window.confirm('Вы уверены, что хотите выйти?')) {
       localStorage.removeItem('anon_user')
       setUser(null)
       setActiveRoom(null)
+      setMenuOpen(false)
     }
   }
 
   if (!user) return <Login onLogin={(u) => setUser(u)} />
 
   const showNotificationButton = 'Notification' in window && notificationStatus !== 'granted'
-  const getNotificationButtonText = () => notificationStatus === 'denied' ? '🔕 Включить уведомления' : '🔔 Уведомления'
+  const getNotificationButtonText = () => {
+    if (notificationStatus === 'denied') return '🔕 Включить уведомления'
+    if (notificationStatus === 'granted') return '🔔 Настроить уведомления'
+    return '🔔 Включить уведомления'
+  }
 
   return (
     <div className="h-screen flex relative">
@@ -377,23 +419,39 @@ export default function App() {
       {!menuOpen && (
         <button
           onClick={() => setMenuOpen(true)}
-          className="md:hidden fixed top-4 left-4 z-50 bg-indigo-600 text-white px-3 py-2 rounded-lg shadow-lg"
+          className="md:hidden fixed z-50 bg-indigo-600 text-white px-3 py-2 rounded-lg shadow-lg"
+          style={{ 
+            top: 'max(16px, env(safe-area-inset-top))',
+            left: 'max(16px, env(safe-area-inset-left))'
+          }}
         >
           ☰ Комнаты
         </button>
       )}
-      
+
       {/* Кнопки в правом верхнем углу */}
-      <div className="absolute top-4 right-4 z-50 flex gap-2">
+      <div 
+        className="fixed z-50 flex gap-2"
+        style={{ 
+          top: 'max(16px, env(safe-area-inset-top))',
+          right: 'max(16px, env(safe-area-inset-right))'
+        }}
+      >
+        {/* ИСПРАВЛЕНИ: Кнопка уведомлений всегда показывается */}
         <button
           onClick={handleRequestNotification}
           className={`px-3 py-2 rounded-lg shadow-lg transition text-sm font-medium ${
-            notificationStatus === 'denied' ? 'bg-red-500 hover:bg-red-600' : 'bg-yellow-500 hover:bg-yellow-600'
+            notificationStatus === 'denied' 
+              ? 'bg-red-500 hover:bg-red-600' 
+              : notificationStatus === 'granted'
+                ? 'bg-green-500 hover:bg-green-600'
+                : 'bg-yellow-500 hover:bg-yellow-600'
           } text-white`}
         >
           {getNotificationButtonText()}
         </button>
         
+        {/* ИСПРАВЛЕНИ: Кнопка установки показывается только когда доступна */}
         {showInstallButton && (
           <button
             onClick={handleInstall}
@@ -417,17 +475,19 @@ export default function App() {
           </div>
           <button
             onClick={() => setMenuOpen(false)}
-            className="md:hidden text-gray-500 text-xl"
+            className="md:hidden text-gray-500 text-xl hover:text-gray-700"
           >
             ✕
           </button>
         </div>
+        
         <button
           onClick={handleLogout}
-          className="text-xs text-red-500 p-3 hover:bg-red-50 transition text-left"
+          className="text-xs text-red-500 p-3 hover:bg-red-50 transition text-left border-b"
         >
-          Выйти на свободу
+          🚪 Выйти
         </button>
+        
         <RoomList 
           onSelectRoom={(r) => {
             setActiveRoom(r)
@@ -438,9 +498,12 @@ export default function App() {
         />
       </div>
       
-      {/* Оверлей */}
+      {/* Оверлей для мобильного меню */}
       {menuOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden" onClick={() => setMenuOpen(false)} />
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-30 md:hidden" 
+          onClick={() => setMenuOpen(false)} 
+        />
       )}
 
       {/* Правая панель с чатом */}
@@ -454,8 +517,8 @@ export default function App() {
         {activeRoom ? (
           <ChatRoom roomId={activeRoom} user={user} />
         ) : (
-          <div className="h-full flex items-center justify-center">
-            <div className="bg-white/90 backdrop-blur-sm p-8 rounded-lg shadow-xl text-center mx-4">
+          <div className="h-full flex items-center justify-center p-4">
+            <div className="bg-white/90 backdrop-blur-sm p-8 rounded-lg shadow-xl text-center max-w-md">
               <div className="text-6xl mb-4">✨</div>
               <div className="text-gray-600 text-lg">
                 Выберите или создайте комнату<br />

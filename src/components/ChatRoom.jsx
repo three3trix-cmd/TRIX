@@ -14,62 +14,75 @@ export default function ChatRoom({ roomId, user }) {
 
   // Функция для локального уведомления (когда вкладка открыта)
   async function showNotification(message) {
-    if (!message || !document.hidden) return
-    if (Notification.permission !== 'granted') return
-    
-    const title = `${message.user_data?.name || 'Кто-то'} написал`
-    const options = {
-      body: message.text.length > 100 ? message.text.slice(0, 100) + '...' : message.text,
-      icon: '/icons/icon-192x192.png',
-      badge: '/icons/icon-72x72.png',
-      vibrate: [200, 100, 200],
-      tag: `room-${roomId}`,
-      renotify: true
-    }
-    
-    try {
-      const registration = await navigator.serviceWorker.getRegistration()
-      if (registration?.showNotification) {
-        registration.showNotification(title, options)
-      } else if (Notification.permission === 'granted') {
-        new Notification(title, options)
-      }
-    } catch (e) {
-      console.warn('Notification failed', e)
-    }
+  if (!message || !document.hidden) return
+  if (Notification.permission !== 'granted') return
+  
+  // ПРОВЕРКА: Не показываем уведомления для заглушенных комнат
+  const mutedRooms = JSON.parse(localStorage.getItem('muted_rooms') || '{}')
+  if (mutedRooms[roomId]) {
+    console.log('[Notification] Комната заглушена, уведомление не показывается')
+    return
   }
+  
+  const title = `${message.user_data?.name || 'Кто-то'} написал`
+  const options = {
+    body: message.text.length > 100 ? message.text.slice(0, 100) + '...' : message.text,
+    icon: '/icons/icon-192x192.png',
+    badge: '/icons/icon-72x72.png',
+    vibrate: [200, 100, 200],
+    tag: `room-${roomId}`,
+    renotify: true
+  }
+  
+  try {
+    const registration = await navigator.serviceWorker.getRegistration()
+    if (registration?.showNotification) {
+      registration.showNotification(title, options)
+    } else if (Notification.permission === 'granted') {
+      new Notification(title, options)
+    }
+  } catch (e) {
+    console.warn('Notification failed', e)
+  }
+}
 
-  // Функция для отправки push-уведомления через Supabase Edge Function
-  async function sendPushNotification(userId, message) {
-    try {
-      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
-      
-      const response = await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-        },
-        body: JSON.stringify({
-          user_id: userId,
-          title: `${message.user_data?.name || 'Кто-то'} написал`,
-          body: message.text.length > 100 ? message.text.slice(0, 100) + '...' : message.text,
-          room_id: roomId,
-          icon: `${window.location.origin}/icons/icon-192x192.png`,
-          badge: `${window.location.origin}/icons/icon-72x72.png`
-        })
-      })
-      
-      if (!response.ok) {
-        console.error('Push send failed:', await response.text())
-      } else {
-        const result = await response.json()
-        console.log('[Push] Уведомления отправлены:', result)
-      }
-    } catch (error) {
-      console.error('Push send error:', error)
+// Функция для отправки push-уведомления через Supabase Edge Function
+async function sendPushNotification(userId, message) {
+  try {
+    // ПРОВЕРКА: Не отправляем уведомления для заглушенных комнат
+    const mutedRooms = JSON.parse(localStorage.getItem('muted_rooms') || '{}')
+    if (mutedRooms[roomId]) {
+      console.log('[Push] Комната заглушена, уведомление не отправляется')
+      return
     }
+    
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+    const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+    
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        'apikey': SUPABASE_ANON_KEY
+      },
+      body: JSON.stringify({
+        user_id: userId,
+        title: `${message.user_data?.name || 'Кто-то'} написал`,
+        body: message.text.length > 100 ? message.text.slice(0, 100) + '...' : message.text,
+        room_id: roomId
+      })
+    })
+    
+    if (!response.ok) {
+      console.error('Push send failed:', await response.text())
+    } else {
+      console.log('[Push] Уведомление отправлено')
+    }
+  } catch (error) {
+    console.error('Push send error:', error)
   }
+}
 
   useEffect(() => {
     if (!roomId) return

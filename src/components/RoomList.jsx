@@ -5,6 +5,7 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
   const [rooms, setRooms] = useState([])
   const [myRoomIds, setMyRoomIds] = useState([])
   const [unreadCounts, setUnreadCounts] = useState({})
+  const [mutedRooms, setMutedRooms] = useState({}) // Новое состояние для mute
   const [newName, setNewName] = useState('')
   const [isPrivate, setIsPrivate] = useState(false)
   const [password, setPassword] = useState('')
@@ -14,24 +15,63 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
   const [joinPassword, setJoinPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
-  // ИСПРАВЛЕНИЕ: Функция загрузки непрочитанных сообщений
+  // Загрузка настроек mute из localStorage
+  useEffect(() => {
+    const savedMuted = JSON.parse(localStorage.getItem('muted_rooms') || '{}')
+    setMutedRooms(savedMuted)
+  }, [])
+
+  // Функция переключения mute для комнаты
+  const toggleMuteRoom = (roomId, roomName, e) => {
+    e.stopPropagation()
+    
+    const newMuted = { ...mutedRooms }
+    const isMuted = !mutedRooms[roomId]
+    
+    if (isMuted) {
+      newMuted[roomId] = true
+      // Показываем уведомление
+      if (Notification.permission === 'granted') {
+        new Notification(`🔇 Чат "${roomName}" заглушен`, {
+          body: 'Вы не будете получать уведомления из этого чата',
+          icon: '/icons/icon-72x72.png',
+          silent: true
+        })
+      }
+    } else {
+      delete newMuted[roomId]
+      if (Notification.permission === 'granted') {
+        new Notification(`🔔 Чат "${roomName}" включен`, {
+          body: 'Уведомления из этого чата снова будут приходить',
+          icon: '/icons/icon-72x72.png',
+          silent: true
+        })
+      }
+    }
+    
+    setMutedRooms(newMuted)
+    localStorage.setItem('muted_rooms', JSON.stringify(newMuted))
+  }
+
+  // Функция загрузки непрочитанных сообщений (обновлена с учетом mute)
   async function loadUnreadCounts(roomsList) {
     const counts = {}
     const lastRead = JSON.parse(localStorage.getItem('last_read_messages') || '{}')
     
     for (const room of roomsList) {
-      // Проверяем, есть ли доступ к комнате
       const hasAccess = !room.is_private || myRoomIds.includes(room.id)
       if (!hasAccess) continue
       
+      // Пропускаем заглушенные комнаты
+      if (mutedRooms[room.id]) continue
+      
       const lastReadTime = lastRead[room.id] || new Date(0).toISOString()
       
-      // ИСПРАВЛЕНИЕ: Используем правильный синтаксис для count
       const { count, error } = await supabase
         .from('messages')
         .select('*', { count: 'exact', head: true })
         .eq('room_id', room.id)
-        .neq('user_data->>id', user.id)  // ИСПРАВЛЕНИЕ: Правильный синтаксис для JSON поля
+        .neq('user_data->>id', user.id)
         .gt('timestamp', lastReadTime)
       
       if (!error) {
@@ -44,14 +84,12 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
   // Загрузка комнат
   async function loadRooms() {
     try {
-      // Загружаем все публичные комнаты
       const { data: publicRooms } = await supabase
         .from('rooms')
         .select('*')
         .eq('is_private', false)
         .order('created_at', { ascending: true })
       
-      // Загружаем ID комнат, где пользователь участник
       const { data: memberRooms } = await supabase
         .from('room_members')
         .select('room_id')
@@ -60,7 +98,6 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
       const memberRoomIds = memberRooms?.map(m => m.room_id) || []
       setMyRoomIds(memberRoomIds)
       
-      // Загружаем приватные комнаты, где пользователь участник
       const { data: privateRooms } = await supabase
         .from('rooms')
         .select('*')
@@ -68,21 +105,17 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
         .eq('is_private', true)
       
       const allRooms = [...(publicRooms || []), ...(privateRooms || [])]
-      // ИСПРАВЛЕНИЕ: Убираем дубликаты комнат
       const uniqueRooms = allRooms.filter((room, index, self) => 
         index === self.findIndex(r => r.id === room.id)
       )
       
       setRooms(uniqueRooms)
-      
-      // Загружаем счетчики непрочитанных
       await loadUnreadCounts(uniqueRooms)
     } catch (err) {
       console.error('Load rooms error:', err)
     }
   }
 
-  // Подписка на изменения
   useEffect(() => {
     loadRooms()
 
@@ -91,7 +124,6 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms' }, () => loadRooms())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'room_members' }, () => loadRooms())
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
-        // ИСПРАВЛЕНИЕ: Обновляем счетчики только для комнаты с новым сообщением
         if (payload.new && payload.new.room_id) {
           loadUnreadCounts(rooms)
         }
@@ -101,7 +133,9 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user.id])
+  }, [user.id, mutedRooms]) // Добавлена зависимость от mutedRooms
+
+  // ... остальные функции (createRoom, joinPrivateRoom, forgetRoom, deleteRoom) остаются без изменений ...
 
   async function createRoom(e) {
     e.preventDefault()
@@ -126,7 +160,6 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
       
       if (error) throw error
       
-      // Добавляем создателя как участника
       await supabase.from('room_members').insert({
         room_id: data.id,
         user_id: user.id,
@@ -157,7 +190,6 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
     setLoading(true)
     
     try {
-      // Ищем комнату по названию
       const { data: room, error } = await supabase
         .from('rooms')
         .select('*')
@@ -166,17 +198,15 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
         .single()
       
       if (error || !room) {
-        alert('Приватный чат с таким названием не найдена')
+        alert('Приватный чат с таким названием не найден')
         return
       }
       
-      // Проверяем пароль
       if (room.password !== joinPassword) {
         alert('Неверный пароль')
         return
       }
       
-      // Проверяем, не является ли пользователь уже участником
       const { data: existing } = await supabase
         .from('room_members')
         .select('*')
@@ -185,7 +215,6 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
         .single()
       
       if (!existing) {
-        // Добавляем пользователя в участники
         await supabase.from('room_members').insert({
           room_id: room.id,
           user_id: user.id,
@@ -219,6 +248,12 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
         .eq('room_id', roomId)
         .eq('user_id', user.id)
       
+      // Удаляем из muted при выходе
+      const newMuted = { ...mutedRooms }
+      delete newMuted[roomId]
+      setMutedRooms(newMuted)
+      localStorage.setItem('muted_rooms', JSON.stringify(newMuted))
+      
       if (activeRoom === roomId) {
         onSelectRoom(null)
       }
@@ -237,6 +272,13 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
     
     try {
       await supabase.from('rooms').delete().eq('id', roomId)
+      
+      // Удаляем из muted при удалении
+      const newMuted = { ...mutedRooms }
+      delete newMuted[roomId]
+      setMutedRooms(newMuted)
+      localStorage.setItem('muted_rooms', JSON.stringify(newMuted))
+      
       if (activeRoom === roomId) {
         onSelectRoom(null)
       }
@@ -247,16 +289,12 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
     }
   }
 
- // Функция для отметки сообщений как прочитанных при входе в комнату
   const handleSelectRoom = (roomId) => {
-    // Сохраняем текущее время как время последнего прочтения
     const lastRead = JSON.parse(localStorage.getItem('last_read_messages') || '{}')
     lastRead[roomId] = new Date().toISOString()
     localStorage.setItem('last_read_messages', JSON.stringify(lastRead))
     
-    // Очищаем счетчик для этой комнаты
     setUnreadCounts(prev => ({ ...prev, [roomId]: 0 }))
-    
     onSelectRoom(roomId)
   }
 
@@ -271,34 +309,69 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
       <div className="p-3 space-y-2">
         <button
           onClick={() => setShowCreateModal(true)}
-          className="w-full bg-indigo-600 text-white px-3 py-2 rounded hover:bg-indigo-700 transition"
-        >
-          + Создать чат
-        </button>
-        <button
-          onClick={() => setShowJoinModal(true)}
-          className="w-full bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 transition"
-        >
-          🔑 Присоединиться к приватнму чату
-        </button>
-      </div>
+    className="w-full bg-indigo-600 text-white px-3 py-2 rounded hover:bg-indigo-700 transition"
+  >
+    + Создать чат
+  </button>
+  
+  <button
+    onClick={() => setShowJoinModal(true)}
+    className="w-full bg-green-600 text-white px-3 py-2 rounded hover:bg-green-700 transition"
+  >
+    🔑 Присоединиться к приватному чату
+  </button>
+  
+  {/* Разделитель */}
+  <div className="border-t my-2"></div>
+  
+  {/* Кнопки управления уведомлениями */}
+  <div className="grid grid-cols-2 gap-2">
+    <button
+      onClick={() => {
+        const allMuted = {}
+        rooms.forEach(r => { 
+          if (isMember(r.id)) allMuted[r.id] = true 
+        })
+        setMutedRooms(allMuted)
+        localStorage.setItem('muted_rooms', JSON.stringify(allMuted))
+      }}
+      className="bg-gray-500 text-white px-3 py-2 rounded hover:bg-gray-600 transition text-xs"
+      title="Отключить уведомления для всех чатов"
+    >
+      🔇 Заглушить все
+    </button>
+    
+    <button
+      onClick={() => {
+        setMutedRooms({})
+        localStorage.setItem('muted_rooms', '{}')
+      }}
+      className="bg-blue-500 text-white px-3 py-2 rounded hover:bg-blue-600 transition text-xs"
+      title="Включить уведомления для всех чатов"
+    >
+      🔔 Включить все
+    </button>
+  </div>
+</div>
+
 
       <div className="flex-1 overflow-auto">
         {rooms.length === 0 ? (
           <div className="p-4 text-center text-gray-500">
-            Нет чата. Создайте первый!
+            Нет чатов. Создайте первый!
           </div>
         ) : (
           rooms.map((r) => {
             const member = isMember(r.id)
             const unread = unreadCounts[r.id] || 0
+            const isMuted = mutedRooms[r.id] || false
             const roomTypeIcon = r.is_private ? '🔒' : '🌐'
-            const roomTypeLabel = r.is_private ? 'Приватная' : 'Публичная'
+            const roomTypeLabel = r.is_private ? 'Приватный' : 'Публичный'
             
             return (
               <div 
                 key={r.id} 
-                className={`border-t ${activeRoom === r.id ? 'bg-indigo-50' : ''}`}
+                className={`border-t ${activeRoom === r.id ? 'bg-indigo-50' : ''} ${isMuted ? 'opacity-75' : ''}`}
               >
                 <div 
                   onClick={() => member && handleSelectRoom(r.id)}
@@ -309,6 +382,7 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
                       <div className="font-medium flex items-center gap-2">
                         <span title={roomTypeLabel}>{roomTypeIcon}</span>
                         <span>{r.name}</span>
+                        {isMuted && <span className="text-gray-400 text-xs" title="Уведомления отключены">🔇</span>}
                         {!member && <span className="text-xs text-gray-400">(нет доступа)</span>}
                       </div>
                       <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
@@ -317,12 +391,26 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {unread > 0 && member && (
+                      {unread > 0 && member && !isMuted && (
                         <span className="bg-red-500 text-white text-xs rounded-full px-2 py-0.5 min-w-[20px] text-center animate-bounce">
                           {unread > 99 ? '99+' : unread}
                         </span>
                       )}
                       <div className="flex gap-1">
+                        {/* Кнопка Mute/Unmute */}
+                        {member && (
+                          <button
+                            onClick={(e) => toggleMuteRoom(r.id, r.name, e)}
+                            className={`text-xs px-2 py-1 rounded transition ${
+                              isMuted 
+                                ? 'bg-gray-400 hover:bg-gray-500 text-white' 
+                                : 'bg-blue-500 hover:bg-blue-600 text-white'
+                            }`}
+                            title={isMuted ? 'Включить уведомления' : 'Отключить уведомления'}
+                          >
+                            {isMuted ? '🔔' : '🔕'}
+                          </button>
+                        )}
                         {r.is_private && member && (
                           <button
                             onClick={(e) => {
@@ -357,7 +445,7 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
         )}
       </div>
 
-      {/* Модальное окно создания комнаты */}
+      {/* Модальные окна остаются без изменений */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-96 max-w-[90%]">
@@ -413,7 +501,6 @@ export default function RoomList({ onSelectRoom, activeRoom, user }) {
         </div>
       )}
 
-      {/* Модальное окно присоединения к приватной комнате */}
       {showJoinModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-96 max-w-[90%]">

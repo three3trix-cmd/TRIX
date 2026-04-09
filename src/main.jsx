@@ -71,11 +71,39 @@ if ('serviceWorker' in navigator) {
       const registration = await navigator.serviceWorker.register('/sw.js')
       console.log('[PWA] Service Worker зарегистрирован')
       
+      
+      // ДОБАВЬТЕ ЭТУ ЗАДЕРЖКУ
+      await registration.update()
+      
+      // Ждем активации Service Worker
+      if (registration.installing) {
+        console.log('[PWA] Ожидание активации Service Worker...')
+        await new Promise((resolve) => {
+          registration.installing.addEventListener('statechange', (e) => {
+            if (e.target.state === 'activated') {
+              resolve()
+            }
+          })
+        })
+      } else if (registration.waiting) {
+        console.log('[PWA] Ожидание активации Service Worker (waiting)...')
+        await new Promise((resolve) => {
+          registration.waiting.addEventListener('statechange', (e) => {
+            if (e.target.state === 'activated') {
+              resolve()
+            }
+          })
+        })
+      }
+      
+      console.log('[PWA] Service Worker активирован')
+      
       // Запрашиваем разрешение на уведомления
       const granted = await requestNotificationPermission()
       
       if (granted) {
-        // Подписываемся на VAPID push-уведомления
+        // ДОБАВЬТЕ ЗАДЕРЖКУ перед подпиской
+        await new Promise(resolve => setTimeout(resolve, 1000))
         await subscribeToPushNotifications(registration)
       }
       
